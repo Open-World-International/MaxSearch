@@ -59,7 +59,7 @@ async function startServer() {
   });
 
   // Proxy for "browsing" to avoid CORS
-  app.get("/api/proxy", async (req, res) => {
+  app.all("/api/proxy", async (req, res) => {
     let { url } = req.query;
     if (!url) return res.status(400).json({ error: "URL is required" });
     
@@ -69,24 +69,69 @@ async function startServer() {
     }
 
     try {
-      const response = await axios.get(targetUrl, {
+      const response = await axios({
+        method: req.method as any,
+        url: targetUrl,
+        data: req.body,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': req.headers['accept'],
+          'Accept-Language': req.headers['accept-language'],
+          'Referer': new URL(targetUrl).origin,
         },
-        responseType: 'text'
+        responseType: 'arraybuffer',
+        validateStatus: () => true, // Allow all status codes
+        timeout: 15000
       });
       
-      let data = response.data;
-      const contentType = response.headers['content-type'];
-      res.setHeader('Content-Type', contentType || 'text/html');
+      // Forward essential headers
+      const headersToForward = ['content-type', 'cache-control', 'content-language', 'content-encoding'];
+      headersToForward.forEach(header => {
+        if (response.headers[header]) {
+          res.setHeader(header, response.headers[header]);
+        }
+      });
 
-      if (typeof data === 'string' && data.toLowerCase().includes('<head>')) {
-        // Inject <base> tag to resolve relative URLs (CSS, JS, Images)
-        data = data.replace(/<head>/i, `<head><base href="${targetUrl}">`);
+      let data = response.data;
+      const contentType = response.headers['content-type'] || '';
+
+      if (contentType.includes('text/html')) {
+        let html = Buffer.from(data).toString('utf-8');
+        if (html.toLowerCase().includes('<head>')) {
+          // Inject <base> tag and a script to help with relative links and dynamic requests
+          const injection = `
+            <head>
+            <base href="${targetUrl}">
+            <script>
+              // Help resolve some dynamic requests by routing them back through our proxy
+              const originalFetch = window.fetch;
+              window.fetch = function() {
+                let [resource, config] = arguments;
+                if (typeof resource === 'string' && (resource.startsWith('/') || !resource.startsWith('http'))) {
+                  const url = new URL(resource, "${targetUrl}");
+                  resource = "/api/proxy?url=" + encodeURIComponent(url.href);
+                }
+                return originalFetch.call(this, resource, config);
+              };
+
+              const originalOpen = XMLHttpRequest.prototype.open;
+              XMLHttpRequest.prototype.open = function(method, url) {
+                if (typeof url === 'string' && (url.startsWith('/') || !url.startsWith('http'))) {
+                  const absoluteUrl = new URL(url, "${targetUrl}");
+                  url = "/api/proxy?url=" + encodeURIComponent(absoluteUrl.href);
+                }
+                return originalOpen.apply(this, arguments);
+              };
+            </script>
+          `;
+          html = html.replace(/<head>/i, injection);
+        }
+        res.send(html);
+      } else {
+        res.send(data);
       }
-      
-      res.send(data);
     } catch (error: any) {
+      console.error('Proxy error:', error.message);
       res.status(500).json({ error: error.message });
     }
   });

@@ -1,5 +1,5 @@
 import React, { Component, useState, useEffect, useRef, ErrorInfo, ReactNode } from 'react';
-import { Search, Globe, Cpu, Shield, Zap, MessageSquare, ChevronRight, Menu, X, Terminal, Globe2, Ghost, LogIn, LogOut, Settings, Key, User as UserIcon, AlertCircle } from 'lucide-react';
+import { Search, Globe, Cpu, Shield, Zap, MessageSquare, ChevronRight, Menu, X, Terminal, Globe2, Ghost, LogIn, LogOut, Settings, Key, User as UserIcon, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { askGemini, askChatGPT, askClaude } from './lib/ai';
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from './firebase';
@@ -346,7 +346,7 @@ export default function App() {
             <Globe className="text-black" size={24} />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-2xl font-display font-bold tracking-tighter text-white leading-none">MaxSearch</h1>
+            <h1 className="text-2xl font-display font-bold tracking-tighter text-white leading-none">MaxSearch <span className="text-maxsearch-accent text-xs align-top ml-1">by OWI</span></h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[8px] md:text-[10px] uppercase tracking-[0.15em] text-maxsearch-accent font-bold opacity-80">Powered by Open World International</span>
               <button 
@@ -628,16 +628,27 @@ export default function App() {
                   onChange={(e) => setBrowserUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleBrowse(browserUrl)}
                   placeholder="Enter URL or search with Brave-like speed..."
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-10 focus:outline-none focus:border-maxsearch-accent focus:ring-1 focus:ring-maxsearch-accent transition-all text-lg font-medium"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-24 focus:outline-none focus:border-maxsearch-accent focus:ring-1 focus:ring-maxsearch-accent transition-all text-lg font-medium"
                 />
-                {browserUrl && (
-                  <button 
-                    onClick={() => setBrowserUrl('')}
-                    className="absolute inset-y-0 right-4 flex items-center text-maxsearch-muted hover:text-white"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
+                <div className="absolute inset-y-0 right-4 flex items-center gap-3">
+                  {browserUrl && (
+                    <button 
+                      onClick={() => handleBrowse(browserUrl)}
+                      className="text-maxsearch-muted hover:text-maxsearch-accent transition-colors"
+                      title="Refresh"
+                    >
+                      <RefreshCw size={18} />
+                    </button>
+                  )}
+                  {browserUrl && (
+                    <button 
+                      onClick={() => setBrowserUrl('')}
+                      className="text-maxsearch-muted hover:text-white"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-4">
@@ -652,10 +663,11 @@ export default function App() {
             <div className="flex-1 overflow-hidden bg-black/20">
               {browserUrl ? (
                 <iframe 
+                  key={browserUrl} // Force re-render on URL change
                   src={`/api/proxy?url=${encodeURIComponent(browserUrl)}`}
                   className="w-full h-full border-none bg-white"
-                  title="MaxSearch Browser"
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                  title="MaxSearch by OWI"
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-storage-access-by-user-activation"
                 />
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-maxsearch-muted">
@@ -779,7 +791,7 @@ export default function App() {
       {/* Footer */}
       <footer className="p-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-bold uppercase tracking-widest text-maxsearch-muted">
         <div className="flex items-center gap-4">
-          <span>&copy; 2026 MaxSearch Browser</span>
+          <span>&copy; 2026 MaxSearch by OWI</span>
           <span className="w-1 h-1 bg-maxsearch-muted rounded-full" />
           <span className="text-maxsearch-accent">Quantum Core v2.4</span>
         </div>
