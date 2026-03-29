@@ -1,0 +1,5 @@
+{
+  "name": "MaxSearch",
+  "description": "An AI-powered browsing tool with integrated Gemini, Claude, and ChatGPT features.",
+  "requestFramePermissions": []
+}
